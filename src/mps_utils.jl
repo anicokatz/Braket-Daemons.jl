@@ -150,9 +150,11 @@ function get_trotterized_circuit_2d(sites, τ::Float64, n_steps::Int, N::Int, Vi
                 push!(two_site_gates, Gj)
             end
         end
+
         @info "current protocol: $protocol"
-        @info "with rabi driving: $rabi_driving"
         Ω_ts = protocol[:rabi_driving]
+        @info "with rabi driving: $Ω_ts"
+
         # Single-site terms: Ω_ts(t)*σX_i/2
         rabi_pulse_gates = map(1:N) do j
             hj_Ω = Ω_ts[i_τ] * op("Sx", sites[j])
@@ -266,7 +268,7 @@ truncation error at each time step
 (`0.` at all times if `compute_truncation_error` is `false`),
 and `ψ` after evolution.
 """
-function compute_MPS_evolution(ψ::MPS, circuit::Vector{Vector{ITensor}}, max_bond_dim::Int, cutoff::Float64, τ::Float64;
+function compute_MPS_evolution(ψ::MPS, circuit::Vector{Vector{ITensor}}, max_bond_dim::Int, cutoff::Float64, τ::Float64, Deltas::Vector{Float64}, Omegas::Vector{Float64};
                          compute_truncation_error::Bool=false, compute_observables::Bool=false, compute_fidelity_susceptibility::Bool=false)
     
     n_τ_steps = length(circuit)
@@ -280,6 +282,8 @@ function compute_MPS_evolution(ψ::MPS, circuit::Vector{Vector{ITensor}}, max_bo
 
     @info "Applying Trotter gates"
     for i_τ in 1:n_τ_steps
+
+        t_start_step = time()
 
         # save observables
         if compute_observables
@@ -307,12 +311,20 @@ function compute_MPS_evolution(ψ::MPS, circuit::Vector{Vector{ITensor}}, max_bo
         # CURRENTLY A FIDELITY SUSCEPTIBILITY IN TIME, MODIFY TO ACCOUNT FOR CHANGES IN DELTA (AS A FUNCTION OF TIME) INSTEAD
         if compute_fidelity_susceptibility
 
-            fidelity = 1 - abs(inner(ψ, ψ_prev))^2
-            fsc = - 2*log(fidelity)/(τ ^ 2)
-            fid_susc_array[i_τ] = fsc
+            diff = Deltas ./ Omegas
+            diff = diff[2:end] .- diff[1:end-1]
+
+            if i_τ == n_τ_steps
+                fsc = 0.0 # assumes abs(inner(ψ, ψ_prev)) = 1 for sufficiently deep in the final phase
+                fid_susc_array[i_τ] = fsc
+            else
+                fidelity = abs(inner(ψ, ψ_prev))
+                fsc = - 2*log(fidelity)/(diff[i_τ] ^ 2)
+                fid_susc_array[i_τ] = fsc
+            end
         end
 
-        @info "Step: $i_τ / $n_τ_steps, current MPS bond dimension is $(maxlinkdim(ψ))"         
+        @info "Step: $i_τ / $n_τ_steps, current MPS bond dimension is $(maxlinkdim(ψ)); time elapsed = $(time()-t_start_step)s"         
     end
 
     return err_array, meas_array, zz_corr_array, fid_susc_array, ψ
@@ -347,6 +359,7 @@ function run(ahs_json, args, file_name::String="ahs_object")
     @info "Starting MPS evolution"
     res = @timed begin
         err_array, meas_array, zz_corr_array, fid_susc_array, ψ = compute_MPS_evolution(ψ, circuit, max_bond_dim, cutoff, τ,
+                                                                            protocol[:global_detuning], protocol[:rabi_driving], # pass delta and omega values for optional fid susc calc; ugly but it works
                                                                             compute_truncation_error=compute_truncation_error,
                                                                             compute_observables=compute_observables,
                                                                             compute_fidelity_susceptibility=compute_fidelity_susceptibility)

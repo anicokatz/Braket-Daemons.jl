@@ -27,21 +27,44 @@ function plot_density(data, fig_path)
     
 end
 
-function plot_correlator(experiment_path, fig_path)
-    csv_data = CSV.File(joinpath(experiment_path, "correlator_zz.csv"))
-    df = DataFrame(csv_data)
-    corr_zz = Matrix{Float64}(df)
+function plot_staggered_magnetization(data, fig_path)
+
+    vals = data["density"]
         
-    num_atoms = size(corr_zz, 1)
-    println(num_atoms, size(corr_zz))
-    
-    xs = [i for i in 0:num_atoms-1]    
+    mags, ts, Nx, Ny = calculate_staggered_magnetization(real(vals))
 
-    fig, ax, hm = heatmap(xs, xs, corr_zz', axis=(;title = "Correlator: <Sz_i(T) Sz_j(T)>", xlabel = "atom index, i", ylabel="atom index, j"))
-
-    Colorbar(fig[:, end+1], colorrange = (-.25, .25))  # equivalent
-    plot_path = joinpath(fig_path, "correlator_zz.png")
+    fig, ax, plt = lines(ts, mags, xlabel = "time, t", ylabel="staggered magnetization, \$ M_{S} \$")
+    plot_path = joinpath(fig_path, "staggered_magnetization.png")
     save(plot_path, fig)
+    
+end
+
+function plot_fidelity_susceptibility(data, fig_path)
+
+    vals = data["fidelity_susceptibility"]
+
+    num_times = length(vals)
+    
+    ts = [i for i in 0:num_times-1]
+
+    fig, ax, plt = lines(ts, real(vals), xlabel = "time, t", ylabel="fidelity susceptibility \$ \\chi_F \$")
+    plot_path = joinpath(fig_path, "fidelity_susceptibility.png")
+    save(plot_path, fig)
+
+end
+
+function plot_truncation_error(data, fig_path)
+
+    vals = data["truncation_error"]
+        
+    num_times = length(vals)
+    
+    ts = [i for i in 0:num_times-1]
+
+    fig, ax, plt = lines(ts, real(vals), xlabel = "time, t", ylabel="truncation_error, \$ \\mathcal{F}(\\psi, \\psi_{TRUE}) \$")
+    plot_path = joinpath(fig_path, "truncation_error.png")
+    save(plot_path, fig)
+    
 end
 
 # function plot_atoms(experiment_path, fig_path)
@@ -83,30 +106,19 @@ end
 # end
 
 function calculate_staggered_magnetization(mags)
-    Nx = Ny = Int(sqrt(size(mags, 2)))
-    num_times = size(mags, 1)
+    Nx = Ny = Int(sqrt(size(mags, 1)))
+    num_times = size(mags, 2)
     ts = [i for i in 0:num_times-1]
 
     staggered_magnetization = zeros(Float64, num_times)
     for j in 1:Nx
         for i in 1:Ny
             idx_phys = Int(Ny*(j-1) + i)
-            m = ( (-1)^(j+i - 2) ) * mags[:, idx_phys]
+            m = ( (-1)^(j+i - 2) ) * mags[idx_phys, :]
             staggered_magnetization += m
         end
     end
     return staggered_magnetization, ts, Nx, Ny
-end
-
-function plot_staggered_magnetization(experiment_path, fig_path)
-    csv_data = CSV.File(joinpath(experiment_path, "z_profile.csv"))
-    df = DataFrame(csv_data)
-    mags = Matrix{Float64}(df)
-    staggered_magnetization, ts, Nx, Ny = calculate_staggered_magnetization(mags)
-
-    fig, ax, plt = lines(ts, staggered_magnetization, axis=(;title = "Staggered magnetization: <Sz_i(T)>", xlabel = "time step, t_j", ylabel="staggered magnetization, <Sz_i(T)>"))
-    plot_path = joinpath(fig_path, "staggered_magnetization.png")
-    save(plot_path, fig)
 end
 
 function plot_variance_staggered_magnetization(experiment_path, fig_path)
@@ -178,5 +190,10 @@ if abspath(PROGRAM_FILE) == @__FILE__
     fig_path = joinpath(dirname(dirname(data_path)), "figures")
 
     plot_density(data, fig_path)
+    plot_fidelity_susceptibility(data, fig_path)
+    # plot_truncation_error(data, fig_path)
+    plot_staggered_magnetization(data, fig_path)
 
 end
+
+# NOTE: ADD SUM OF DISCARDED EIGENVALUES TO THE mps_utils.jl CODE IF POSSIBLE
