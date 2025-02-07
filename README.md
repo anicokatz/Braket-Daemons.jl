@@ -1,3 +1,5 @@
+# NOT APPLICABLE, REWRITE
+
 # tensor-network-ahs
 
 This package implements a tensor network based algorithm for simulating Rydberg atom dynamics.
