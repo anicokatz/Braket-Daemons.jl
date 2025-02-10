@@ -74,18 +74,16 @@ include("descartes_daemon.jl")
 @info "Saving results"
 save_results(results, results_path)
 
-# # plot results
-# if input_params["meta-parameters"]["generate-plots"]
+# Add this line before using plot_all
+include("plotter.jl")
 
-#     # generate figures path
-#     figures_path = joinpath(input_params["path"], "figures")
-
-#     include("plotter.jl")
-
-#     @info "Plotting results from $results_path to $figures_path"
-#     plot_all(results_path, figures_path)
-#     @info "Plotting complete."
-
-# end
+# plot results
+if input_params["meta-parameters"]["generate-plots"]
+    figures_path = joinpath(input_params["path"], "figures")
+    @info "Plotting results from $results_path to $figures_path"
+    results_file = joinpath(results_path, "processed_results.h5")   
+    plot_all(results_file, figures_path)
+    @info "Plotting complete."
+end
 
 @info "Finished execution."

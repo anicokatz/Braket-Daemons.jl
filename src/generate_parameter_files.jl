@@ -1,31 +1,32 @@
 using JSON3
 
 model_parameters = Dict{String, Any}(
-                        "L" => 5,                                   # size of LxL square array of atoms, atom number calculated in lattice mapper
-                        "interaction-radius" => 7e-6,               # the interaction radius in meters
+                        "L" => 3,                                   # size of LxL square array of atoms, atom number calculated in lattice mapper
+                        "interaction-radius" => 15e-6,                   # the cutoff radius in meters
+                        "lattice-spacing" => 7e-6,                  # the lattice spacing in meters
                         "C6" => 5.42e-24)                           # C6 interaction constant
 
 sweep_parameters = Dict{String, Any}(
                         "delta-min" => -3.,                         # minimum delta/omega ratio
                         "delta-max" => 3.,                         # maximum delta/omega ratio
-                        "switch-time" => 0.1,                       # NOT IMPLEMENTED (deprecated - protocol specific): time at which delta and omega scans switch (in microseconds)
-                        "sweep-type" => 'r',                        # NOT IMPLEMENTED (deprecated - protocol specific): delta ramp type: options are 'l' for linear, or 'e' for exponential/logarithmic
+                        "switch-time" => 0.1,                       # time at which delta and omega scans switch (in microseconds)
+                        "sweep-type" => 'r',                        # delta ramp type: options are 'l' for linear, or 'e' for exponential/logarithmic
                         "rydberg-ratio" => 1.2)                     # rydberg Rb/a ratio, implicitly determines maximum Omega value             
                     
 simulation_parameters = Dict{String, Any}(
-                        "sim-type" => "adiabatic_baseline",         # name of the sweep protocol (also generates a file by this name)
-                        "cutoff" => 1e-10,                           # cutoff for SVD values in MPS evolution
-                        "max-bond-dim" => 50,                       # maximum bond dimension for MPS
+                        "sim-type" => "localdetuning_baseline",         # name of the sweep protocol (also generates a file by this name)
+                        "cutoff" => 1e-8,                           # cutoff for SVD values in MPS evolution
+                        "max-bond-dim" => 20,                       # maximum bond dimension for MPS
                         "shots" => 2000,                            # number of shots for sampling
-                        "n-tau-steps" => 400)                        # time evolution step count (does this take precedence over above?)
+                        "n-tau-steps" => 250)                       # time evolution step count (does this take precedence over above?)
 
 measurement_parameters = Dict{String, Any}(
-                        "compute-truncation-error" => false,         # compute truncation error during runtime
+                        "compute-truncation-error" => true,         # compute truncation error during runtime
                         "compute-observables" => true,              # compute observables during runtime
                         "compute-fidelity-susceptibility" => true,  # compute fidelity susceptibility using raw value of tau as the perturbation step ALTER TO EXTRACT CHANGE IN DELTA
                         "sample-shots-runtime" => false)            # NOT YET IMPLEMENTED: samples shots at every timestep (potentially very expensive)
 
-meta_parameters = Dict{String, Any}("generate-plots" => true)      # REDUNDANT: deprecated, generate plots after experiment is finished
+meta_parameters = Dict{String, Any}("generate-plots" => true)      # generate plots after experiment is finished
 #                        "path" => )                                 # store general working directory path
 
 # PATHING PARAMETERS

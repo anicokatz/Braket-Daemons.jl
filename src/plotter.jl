@@ -5,10 +5,15 @@ using CairoMakie
 using CairoMakie: heatmap, scatter, lines, Colorbar
 using Base
 using ITensors.HDF5 
+using DataFrames
 
-function plot_density(data, fig_path)
 
-    vals = data["density"]
+function plot_density(results_path, fig_path)
+    h5open(results_path, "r") do fr
+        global data = read(fr)
+    end
+
+    vals = real(data["density"])
         
     num_atoms, num_times = size(vals)
     
@@ -27,44 +32,23 @@ function plot_density(data, fig_path)
     
 end
 
-function plot_staggered_magnetization(data, fig_path)
+# Note that the correlator is saved for all time steps, but we only plot the final time step
+function plot_correlator(results_path, fig_path)
+    h5open(results_path, "r") do fr
+        global data = read(fr)
+    end
 
-    vals = data["density"]
-        
-    mags, ts, Nx, Ny = calculate_staggered_magnetization(real(vals))
+    corr_zz = real(data["correlator_zz"])
+    corr_zz_final = corr_zz[:,:,end]
+    num_atoms = size(corr_zz_final, 1)
+    
+    xs = [i for i in 0:num_atoms-1]    
 
-    fig, ax, plt = lines(ts, mags, xlabel = "time, t", ylabel="staggered magnetization, \$ M_{S} \$")
-    plot_path = joinpath(fig_path, "staggered_magnetization.png")
+    fig, ax, hm = heatmap(xs, xs, corr_zz_final, axis=(;title = "Correlator: <Sz_i(T) Sz_j(T)>", xlabel = "atom index, i", ylabel="atom index, j"))
+
+    Colorbar(fig[:, end+1], colorrange = (-.25, .25))  # equivalent
+    plot_path = joinpath(fig_path, "correlator_zz.png")
     save(plot_path, fig)
-    
-end
-
-function plot_fidelity_susceptibility(data, fig_path)
-
-    vals = data["fidelity_susceptibility"]
-
-    num_times = length(vals)
-    
-    ts = [i for i in 0:num_times-1]
-
-    fig, ax, plt = lines(ts, real(vals), xlabel = "time, t", ylabel="fidelity susceptibility \$ \\chi_F \$")
-    plot_path = joinpath(fig_path, "fidelity_susceptibility.png")
-    save(plot_path, fig)
-
-end
-
-function plot_truncation_error(data, fig_path)
-
-    vals = data["truncation_error"]
-        
-    num_times = length(vals)
-    
-    ts = [i for i in 0:num_times-1]
-
-    fig, ax, plt = lines(ts, real(vals), xlabel = "time, t", ylabel="truncation_error, \$ \\mathcal{F}(\\psi, \\psi_{TRUE}) \$")
-    plot_path = joinpath(fig_path, "truncation_error.png")
-    save(plot_path, fig)
-    
 end
 
 # function plot_atoms(experiment_path, fig_path)
@@ -106,34 +90,56 @@ end
 # end
 
 function calculate_staggered_magnetization(mags)
-    Nx = Ny = Int(sqrt(size(mags, 1)))
-    num_times = size(mags, 2)
+    Nx = Ny = Int(sqrt(size(mags, 2)))
+    num_times = size(mags, 1)
     ts = [i for i in 0:num_times-1]
 
     staggered_magnetization = zeros(Float64, num_times)
     for j in 1:Nx
         for i in 1:Ny
             idx_phys = Int(Ny*(j-1) + i)
-            m = ( (-1)^(j+i - 2) ) * mags[idx_phys, :]
+            m = ( (-1)^(j+i - 2) ) * mags[:, idx_phys]
             staggered_magnetization += m
         end
     end
     return staggered_magnetization, ts, Nx, Ny
 end
 
-function plot_variance_staggered_magnetization(experiment_path, fig_path)
+function plot_staggered_magnetization(results_path, fig_path)
+    h5open(results_path, "r") do fr
+        global data = read(fr)
+    end
+
+    data_density = real(data["density"])
+    # Taking transpose to match the correlator shape
+    data_density = permutedims(data_density, (2, 1))
+    df = DataFrame(data_density, :auto)
+    mags = Matrix{Float64}(df)
+    staggered_magnetization, ts, Nx, Ny = calculate_staggered_magnetization(mags)
+
+    fig, ax, plt = lines(ts, staggered_magnetization, axis=(;title = "Staggered magnetization: <Sz_i(T)>", xlabel = "time step, t_j", ylabel="staggered magnetization, <Sz_i(T)>"))
+    plot_path = joinpath(fig_path, "staggered_magnetization.png")
+    save(plot_path, fig)
+end
+
+function plot_variance_staggered_magnetization(results_path, fig_path)
+    h5open(results_path, "r") do fr
+        global data = read(fr)
+    end
+
     # Get z_profile data for staggered magnetization
-    csv_data = CSV.File(joinpath(experiment_path, "z_profile.csv"))
-    df = DataFrame(csv_data)
+    data_density = real(data["density"])
+    data_density = permutedims(data_density, (2, 1))
+    df = DataFrame(data_density, :auto)
     mags = Matrix{Float64}(df)
     staggered_magnetization, ts, Nx, Ny = calculate_staggered_magnetization(mags)
     variance_staggered_magnetization = -(staggered_magnetization .^ 2)
 
     # Get correlator data
-    csv_data = CSV.File(joinpath(experiment_path, "correlator_zz.csv"))
-    df = DataFrame(csv_data)
-    corr_zz = Matrix{Float64}(df)
-    
+    corr_data = real(data["correlator_zz"])
+    # Taking final time step
+    corr_zz = corr_data[:,:,end]
+    corr_zz = Matrix{Float64}(corr_zz)
     # Calculate variance using the single correlator matrix
     corr_t = corr_zz  # Already in the right shape
     sum_corr = 0.0
@@ -158,19 +164,22 @@ function plot_variance_staggered_magnetization(experiment_path, fig_path)
     save(plot_path, fig)
 end
 
-function plot_all(data, fig_path)
-    # plot_correlator(experiment_path)
-    # plot_atoms(experiment_path, fig_path)
-    # plot_bitstrings(experiment_path, fig_path)
-    # plot_z_profile(experiment_path)
-    # plot_variance_staggered_magnetization(experiment_path)
-
-    plot_density(data, fig_path)
-    plot_staggered_magnetization(data, fig_path)
-
+function plot_all(results_path, fig_path)
+    plot_density(results_path, fig_path)
+    plot_correlator(results_path, fig_path) 
+    plot_staggered_magnetization(results_path, fig_path)
+    plot_variance_staggered_magnetization(results_path, fig_path)
 end
 
+
+# example usage
+results_path = "data/localdetuning_baseline/ratio_1_2/L_3/chi_20/results/processed_results.h5"
+fig_path = "data/localdetuning_baseline/ratio_1_2/L_3/chi_20/figures"
+plot_all(results_path, fig_path)
+
+
 # Add main entry point to handle command line arguments
+#=
 if abspath(PROGRAM_FILE) == @__FILE__
 
     if length(ARGS) != 1
@@ -190,10 +199,6 @@ if abspath(PROGRAM_FILE) == @__FILE__
     fig_path = joinpath(dirname(dirname(data_path)), "figures")
 
     plot_density(data, fig_path)
-    plot_fidelity_susceptibility(data, fig_path)
-    # plot_truncation_error(data, fig_path)
-    plot_staggered_magnetization(data, fig_path)
 
 end
-
-# NOTE: ADD SUM OF DISCARDED EIGENVALUES TO THE mps_utils.jl CODE IF POSSIBLE
+=#
