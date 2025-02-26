@@ -1,14 +1,14 @@
 using JSON3
 
 model_parameters = Dict{String, Any}(
-                        "L" => 3,                                   # size of LxL square array of atoms, atom number calculated in lattice mapper
-                        "interaction-radius" => 15e-6,                   # the cutoff radius in meters
+                        "L" => 9,                                   # size of LxL square array of atoms, atom number calculated in lattice mapper
+                        "interaction-radius" => 15e-6,              # the cutoff radius in meters
                         "lattice-spacing" => 7e-6,                  # the lattice spacing in meters
                         "C6" => 5.42e-24)                           # C6 interaction constant
 
 sweep_parameters = Dict{String, Any}(
                         "delta-min" => -3.,                         # minimum delta/omega ratio
-                        "delta-max" => 3.,                         # maximum delta/omega ratio
+                        "delta-max" => 3.,                          # maximum delta/omega ratio
                         "switch-time" => 0.1,                       # time at which delta and omega scans switch (in microseconds)
                         "sweep-type" => 'r',                        # delta ramp type: options are 'l' for linear, or 'e' for exponential/logarithmic
                         "rydberg-ratio" => 1.2)                     # rydberg Rb/a ratio, implicitly determines maximum Omega value             

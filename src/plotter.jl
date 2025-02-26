@@ -129,7 +129,8 @@ function plot_variance_staggered_magnetization(results_path, fig_path)
 
     # Get z_profile data for staggered magnetization
     data_density = real(data["density"])
-    data_density = permutedims(data_density, (2, 1))
+    println(size(data_density))
+    # data_density = permutedims(data_density, (2, 1))
     df = DataFrame(data_density, :auto)
     mags = Matrix{Float64}(df)
     staggered_magnetization, ts, Nx, Ny = calculate_staggered_magnetization(mags)
@@ -137,27 +138,26 @@ function plot_variance_staggered_magnetization(results_path, fig_path)
 
     # Get correlator data
     corr_data = real(data["correlator_zz"])
-    # Taking final time step
-    corr_zz = corr_data[:,:,end]
-    corr_zz = Matrix{Float64}(corr_zz)
-    # Calculate variance using the single correlator matrix
-    corr_t = corr_zz  # Already in the right shape
-    sum_corr = 0.0
-    for j in 1:Nx
-        for i in 1:Ny
-            for jp in 1:Nx
-                for ip in 1:Ny
-                    # Subtract 1 from indices since we're 0-based indexing in the physical system
-                    idx_phys_1 = Int(Ny*(j-1) + i) - 1
-                    idx_phys_2 = Int(Ny*(jp-1) + ip) - 1
-                    # Add 1 back for Julia's 1-based array indexing
-                    m = ( (-1)^(j+i+jp+ip - 4) ) * corr_t[idx_phys_1 + 1, idx_phys_2 + 1]
-                    sum_corr += m
+    for t in 1:ts
+        # Calculate variance using the single correlator matrix for each t
+        corr_t = corr_data[:,:,t]  # Already in the right shape
+        sum_corr = 0.0
+            for j in 1:Nx
+                for i in 1:Ny
+                    for jp in 1:Nx
+                        for ip in 1:Ny
+                        # Subtract 1 from indices since we're 0-based indexing in the physical system
+                            idx_phys_1 = Int(Ny*(j-1) + i) - 1
+                            idx_phys_2 = Int(Ny*(jp-1) + ip) - 1
+                             # Add 1 back for Julia's 1-based array indexing
+                            m = ( (-1)^(j+i+jp+ip - 4) ) * corr_t[idx_phys_1 + 1, idx_phys_2 + 1]
+                        sum_corr += m
+                    end
                 end
             end
         end
-    end
     variance_staggered_magnetization[end] += sum_corr
+    end 
 
     fig, ax, plt = lines(ts, variance_staggered_magnetization, axis=(;title = "Variance of staggered magnetization: <(Sz_i(T) - <Sz_i(T)>)^2>", xlabel = "time step, t_j", ylabel="variance of staggered magnetization, <(Sz_i(T) - <Sz_i(T)>)^2>"))
     plot_path = joinpath(fig_path, "variance_staggered_magnetization.png")
